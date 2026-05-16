@@ -237,8 +237,9 @@ export default function DashboardPage() {
           ) : (
             <div className="space-y-4 overflow-y-auto max-h-56">
               {shelves.map((shelf) => {
-                const pct = shelf.capacity.max > 0
-                  ? Math.round((shelf.capacity.current / shelf.capacity.max) * 100)
+                const cap = shelf.capacity ?? { current: 0, max: 0 }
+                const pct = cap.max > 0
+                  ? Math.round((cap.current / cap.max) * 100)
                   : 0
                 return (
                   <div key={shelf.id}>
@@ -256,7 +257,7 @@ export default function DashboardPage() {
                         />
                       </div>
                       <span className="text-xs text-gray-400 w-10 text-right">
-                        {shelf.capacity.current}/{shelf.capacity.max}
+                        {cap.current}/{cap.max}
                       </span>
                     </div>
                   </div>

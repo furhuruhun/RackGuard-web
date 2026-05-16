@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import KPICard from '@/components/KPICard'
 import { KPICardSkeleton } from '@/components/SkeletonLoader'
 import { formatCurrency } from '@/lib/utils'
-import { Printer, BookOpen, Users, Clock, AlertTriangle } from 'lucide-react'
+import { Printer, BookOpen, Users, Clock, AlertTriangle, Hourglass } from 'lucide-react'
 import { database, isFirebaseConfigured } from '@/lib/firebase'
 import { ref, onValue } from 'firebase/database'
 import {
@@ -46,6 +46,7 @@ interface ReportStats {
   uniqueMembers: number
   avgReturnDays: number | null
   totalFines: number
+  pendingPayments: number
   monthlyData: { month: string; peminjaman: number; pengembalian: number }[]
   categoryData: { name: string; value: number; color: string }[]
   dailyData: { day: string; transaksi: number }[]
@@ -82,8 +83,13 @@ function computeStats(
       ? returnDurations.reduce((a, b) => a + b, 0) / returnDurations.length
       : null
 
-  // Total fines
-  const totalFines = txList.reduce((sum, t) => sum + (t.fine ?? 0), 0)
+  // Total fines — only from transactions with paymentStatus === 'success'
+  const totalFines = txList
+    .filter((t) => t.paymentStatus === 'success')
+    .reduce((sum, t) => sum + (t.fine ?? 0), 0)
+
+  // Pending payments count
+  const pendingPayments = txList.filter((t) => t.paymentStatus === 'pending').length
 
   // Monthly borrowings & returns — group by month of borrowDate / returnDate
   // Show months that actually appear in the data
@@ -166,6 +172,7 @@ function computeStats(
     uniqueMembers,
     avgReturnDays,
     totalFines,
+    pendingPayments,
     monthlyData,
     categoryData,
     dailyData,
@@ -237,11 +244,11 @@ export default function ReportsPage() {
 
       {/* KPI Cards */}
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-          <KPICardSkeleton /><KPICardSkeleton /><KPICardSkeleton /><KPICardSkeleton />
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          <KPICardSkeleton /><KPICardSkeleton /><KPICardSkeleton /><KPICardSkeleton /><KPICardSkeleton />
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
           <KPICard
             title="Total Transaksi"
             value={String(stats!.totalTransactions)}
@@ -277,10 +284,18 @@ export default function ReportsPage() {
           <KPICard
             title="Total Denda"
             value={formatCurrency(stats!.totalFines)}
-            subtitle="Akumulasi semua transaksi"
+            subtitle="Dari pembayaran lunas"
             icon={AlertTriangle}
             iconColor="text-red-600"
             iconBg="bg-red-50"
+          />
+          <KPICard
+            title="Pembayaran Pending"
+            value={String(stats!.pendingPayments)}
+            subtitle="Belum dikonfirmasi"
+            icon={Hourglass}
+            iconColor="text-yellow-600"
+            iconBg="bg-yellow-50"
           />
         </div>
       )}

@@ -1,16 +1,16 @@
 'use client'
 
 import { useEffect, useState, useCallback, FormEvent } from 'react'
-import { ref, onValue, set, update } from 'firebase/database'
+import { ref, onValue, set, update, get } from 'firebase/database'
 import { database, isFirebaseConfigured } from '@/lib/firebase'
-import { Member } from '@/types'
+import { Member, Notification } from '@/types'
 import StatusBadge from '@/components/StatusBadge'
 import Modal from '@/components/Modal'
 import AvatarInitials from '@/components/AvatarInitials'
 import { CardGridSkeleton } from '@/components/SkeletonLoader'
 import { useToastStore } from '@/store/toastStore'
-import { debounce, formatMonthYear } from '@/lib/utils'
-import { Plus, Search, Users } from 'lucide-react'
+import { debounce, formatMonthYear, formatDate } from '@/lib/utils'
+import { Plus, Search, Users, Bell } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 const EMPTY_FORM = {
@@ -89,8 +89,10 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [debouncedQuery, setDebouncedQuery] = useState('')
-  const [modalType, setModalType] = useState<'add' | 'edit' | 'confirm' | null>(null)
+  const [modalType, setModalType] = useState<'add' | 'edit' | 'confirm' | 'notifications' | null>(null)
   const [selectedMember, setSelectedMember] = useState<Member | null>(null)
+  const [memberNotifs, setMemberNotifs] = useState<Notification[]>([])
+  const [notifLoading, setNotifLoading] = useState(false)
   const [formData, setFormData] = useState<FormData>(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [confirmAction, setConfirmAction] = useState<'suspend' | 'activate' | null>(null)
@@ -162,10 +164,32 @@ export default function MembersPage() {
     setModalType('confirm')
   }
 
+  const openNotifications = (member: Member) => {
+    setSelectedMember(member)
+    setMemberNotifs([])
+    setModalType('notifications')
+    if (!isFirebaseConfigured || !database) return
+    setNotifLoading(true)
+    get(ref(database, `notifications/${member.id}`))
+      .then((snap) => {
+        if (snap.exists()) {
+          const data = snap.val() as Record<string, Omit<Notification, 'id'>>
+          setMemberNotifs(
+            Object.entries(data)
+              .map(([id, v]) => ({ id, ...v } as Notification))
+              .sort((a, b) => b.createdAt - a.createdAt)
+          )
+        }
+      })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false))
+  }
+
   const closeModal = () => {
     setModalType(null)
     setSelectedMember(null)
     setConfirmAction(null)
+    setMemberNotifs([])
   }
 
   const handleFormChange = (field: keyof FormData, val: string | number) => {
@@ -304,6 +328,13 @@ export default function MembersPage() {
                 >
                   Edit
                 </button>
+                <button
+                  onClick={() => openNotifications(member)}
+                  className="py-1.5 px-3 text-xs font-medium text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+                  title="Riwayat Notifikasi"
+                >
+                  <Bell className="w-3.5 h-3.5" />
+                </button>
                 {member.status !== 'suspended' ? (
                   <button
                     onClick={() => openConfirm(member, 'suspend')}
@@ -350,6 +381,56 @@ export default function MembersPage() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Notification History Modal */}
+      <Modal
+        open={modalType === 'notifications'}
+        onClose={closeModal}
+        title={`Riwayat Notifikasi — ${selectedMember?.name ?? ''}`}
+        size="lg"
+      >
+        {notifLoading ? (
+          <div className="flex justify-center py-10">
+            <div className="w-7 h-7 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : memberNotifs.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 py-10 text-center">
+            <Bell className="w-10 h-10 text-gray-300" />
+            <p className="text-gray-400 font-medium">Belum ada notifikasi</p>
+            <p className="text-gray-300 text-sm">Sistem belum mengirim notifikasi ke anggota ini.</p>
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-96 overflow-y-auto -mx-1 px-1">
+            {memberNotifs.map((notif) => (
+              <div
+                key={notif.id}
+                className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 bg-gray-50"
+              >
+                <span
+                  className={`mt-0.5 inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold shrink-0 ${
+                    notif.type === 'overdue'
+                      ? 'bg-red-100 text-red-700'
+                      : 'bg-blue-100 text-blue-700'
+                  }`}
+                >
+                  {notif.type === 'overdue' ? 'Terlambat' : 'Pengingat'}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 leading-snug">{notif.title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5 leading-relaxed">{notif.message}</p>
+                  <p className="text-xs text-gray-400 mt-1">{formatDate(notif.createdAt)}</p>
+                </div>
+                <span
+                  className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                    notif.read ? 'bg-gray-300' : 'bg-blue-500'
+                  }`}
+                  title={notif.read ? 'Sudah dibaca' : 'Belum dibaca'}
+                />
+              </div>
+            ))}
+          </div>
+        )}
       </Modal>
 
       {/* Confirm Modal */}

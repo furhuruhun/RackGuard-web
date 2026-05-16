@@ -8,7 +8,7 @@ import StatusBadge from '@/components/StatusBadge'
 import Modal from '@/components/Modal'
 import { TableSkeleton } from '@/components/SkeletonLoader'
 import { formatDate, formatCurrency, debounce, exportCSV } from '@/lib/utils'
-import { Search, Download, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react'
+import { Search, Download, ArrowLeftRight, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Clock, CheckCircle2 } from 'lucide-react'
 
 type SortField = 'id' | 'bookTitle' | 'memberName' | 'borrowDate' | 'dueDate' | 'fine' | 'status'
 type SortDir = 'asc' | 'desc'
@@ -124,6 +124,7 @@ export default function TransactionsPage() {
         'Tanggal Kembali': tx.dueDate,
         'Kembali Aktual': tx.returnDate ? formatDate(tx.returnDate) : '-',
         Denda: tx.fine,
+        Pembayaran: tx.paymentStatus ?? '-',
         Status: tx.status,
       })),
       `transaksi-${new Date().toISOString().split('T')[0]}.csv`
@@ -211,6 +212,14 @@ export default function TransactionsPage() {
                   : <span className="text-gray-400">-</span>,
               },
               { label: 'Status', value: <StatusBadge status={selectedTx.status} /> },
+              {
+                label: 'Pembayaran',
+                value: selectedTx.paymentStatus === 'success'
+                  ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700"><CheckCircle2 className="w-3 h-3" />Lunas</span>
+                  : selectedTx.paymentStatus === 'pending'
+                  ? <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700"><Clock className="w-3 h-3" />Pending</span>
+                  : <span className="text-gray-400">-</span>,
+              },
             ].map(({ label, value }) => (
               <div key={label} className="flex items-center justify-between gap-4 text-sm">
                 <span className="text-gray-500 shrink-0">{label}</span>
@@ -243,6 +252,7 @@ export default function TransactionsPage() {
                         { label: 'Tanggal Pinjam', field: 'borrowDate' as SortField },
                         { label: 'Jatuh Tempo', field: 'dueDate' as SortField },
                         { label: 'Denda', field: 'fine' as SortField },
+                        { label: 'Pembayaran', field: null },
                         { label: 'Status', field: 'status' as SortField },
                       ] as { label: string; field: SortField | null }[]
                     ).map(({ label, field }) =>
@@ -314,6 +324,21 @@ export default function TransactionsPage() {
                           </span>
                         ) : (
                           <span className="text-gray-300">-</span>
+                        )}
+                      </td>
+                      <td className="px-5 py-4 whitespace-nowrap">
+                        {tx.paymentStatus === 'success' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Lunas
+                          </span>
+                        ) : tx.paymentStatus === 'pending' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700">
+                            <Clock className="w-3 h-3" />
+                            Pending
+                          </span>
+                        ) : (
+                          <span className="text-gray-300 text-xs">-</span>
                         )}
                       </td>
                       <td className="px-5 py-4">

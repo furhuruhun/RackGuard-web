@@ -1,14 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { ref, onValue } from 'firebase/database'
+import { ref, onValue, update } from 'firebase/database'
 import { database, isFirebaseConfigured } from '@/lib/firebase'
 import { Shelf } from '@/types'
 import StatusBadge from '@/components/StatusBadge'
 import { CardGridSkeleton } from '@/components/SkeletonLoader'
 import { formatRelativeTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
-import { Server, Thermometer, Lock, Unlock } from 'lucide-react'
+import { Server, Thermometer, Lock, Unlock, KeyRound } from 'lucide-react'
+import { useToastStore } from '@/store/toastStore'
 
 // Fallback demo shelves so the page isn't empty without Firebase
 const DEMO_SHELVES: Shelf[] = [
@@ -74,7 +75,7 @@ const DEMO_SHELVES: Shelf[] = [
   },
 ]
 
-function ShelfCard({ shelf }: { shelf: Shelf }) {
+function ShelfCard({ shelf, onUnlock }: { shelf: Shelf; onUnlock: () => void }) {
   const pct =
     shelf.capacity.max > 0
       ? Math.round((shelf.capacity.current / shelf.capacity.max) * 100)
@@ -160,6 +161,17 @@ function ShelfCard({ shelf }: { shelf: Shelf }) {
           </p>
         </div>
       </div>
+
+      {/* Manual Unlock */}
+      <div className="pt-3 mt-2 border-t border-gray-50">
+        <button
+          onClick={onUnlock}
+          className="flex items-center gap-1.5 text-xs text-amber-600 hover:text-amber-700 font-medium"
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          Manual Unlock
+        </button>
+      </div>
     </div>
   )
 }
@@ -167,6 +179,18 @@ function ShelfCard({ shelf }: { shelf: Shelf }) {
 export default function ShelfStatusPage() {
   const [shelves, setShelves] = useState<Shelf[]>([])
   const [loading, setLoading] = useState(true)
+  const addToast = useToastStore((s) => s.addToast)
+
+  const handleManualUnlock = async (shelfId: string) => {
+    const confirmed = window.confirm(`Buka rak ${shelfId} secara manual?`)
+    if (!confirmed) return
+    try {
+      await update(ref(database, `shelves/${shelfId}`), { lockStatus: 'unlocked' })
+      addToast('success', `Rak ${shelfId} berhasil dibuka.`)
+    } catch {
+      addToast('error', `Gagal membuka rak ${shelfId}.`)
+    }
+  }
 
   useEffect(() => {
     if (!isFirebaseConfigured || !database) {
@@ -234,7 +258,7 @@ export default function ShelfStatusPage() {
       {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {shelves.map((shelf) => (
-          <ShelfCard key={shelf.id} shelf={shelf} />
+          <ShelfCard key={shelf.id} shelf={shelf} onUnlock={() => handleManualUnlock(shelf.id)} />
         ))}
       </div>
     </div>
