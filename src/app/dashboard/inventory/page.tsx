@@ -178,10 +178,10 @@ export default function InventoryPage() {
     .filter((b) => {
       const q = debouncedQuery.toLowerCase()
       return (
-        b.title.toLowerCase().includes(q) ||
-        b.author.toLowerCase().includes(q) ||
-        b.id.toLowerCase().includes(q) ||
-        b.isbn.toLowerCase().includes(q)
+        (b.title ?? '').toLowerCase().includes(q) ||
+        (b.author ?? '').toLowerCase().includes(q) ||
+        (b.id ?? '').toLowerCase().includes(q) ||
+        (b.isbn ?? '').toLowerCase().includes(q)
       )
     })
     .sort((a, b) => {
